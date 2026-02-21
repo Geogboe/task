@@ -2403,6 +2403,54 @@ func TestBashShellOptsCommandLevel(t *testing.T) {
 	assert.Equal(t, "globstar\ton\n", buff.String())
 }
 
+func TestCustomShGlobalLevel(t *testing.T) {
+	t.Parallel()
+
+	var buff bytes.Buffer
+	e := task.NewExecutor(
+		task.WithDir("testdata/sh/global_level"),
+		task.WithStdout(&buff),
+		task.WithStderr(&buff),
+	)
+	require.NoError(t, e.Setup())
+
+	err := e.Run(t.Context(), &task.Call{Task: "default"})
+	require.NoError(t, err)
+	assert.Equal(t, "env true\n", buff.String())
+}
+
+func TestCustomShTaskLevel(t *testing.T) {
+	t.Parallel()
+
+	var buff bytes.Buffer
+	e := task.NewExecutor(
+		task.WithDir("testdata/sh/task_level"),
+		task.WithStdout(&buff),
+		task.WithStderr(&buff),
+	)
+	require.NoError(t, e.Setup())
+
+	err := e.Run(t.Context(), &task.Call{Task: "default"})
+	require.NoError(t, err)
+	assert.Equal(t, "env true\n", buff.String())
+}
+
+func TestCustomShCommandLevel(t *testing.T) {
+	t.Parallel()
+
+	var buff bytes.Buffer
+	e := task.NewExecutor(
+		task.WithDir("testdata/sh/command_level"),
+		task.WithStdout(&buff),
+		task.WithStderr(&buff),
+	)
+	require.NoError(t, e.Setup())
+
+	err := e.Run(t.Context(), &task.Call{Task: "default"})
+	require.NoError(t, err)
+	assert.Equal(t, "env true\n", buff.String())
+}
+
 func TestSplitArgs(t *testing.T) {
 	t.Parallel()
 

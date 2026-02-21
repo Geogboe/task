@@ -29,6 +29,7 @@ type Task struct {
 	Dir           string
 	Set           []string
 	Shopt         []string
+	Sh            ShArgs
 	Vars          *Vars
 	Env           *Vars
 	Dotenv        []string
@@ -141,6 +142,7 @@ func (t *Task) UnmarshalYAML(node *yaml.Node) error {
 			Dir           string
 			Set           []string
 			Shopt         []string
+			Sh            ShArgs
 			Vars          *Vars
 			Env           *Vars
 			Dotenv        []string
@@ -181,6 +183,7 @@ func (t *Task) UnmarshalYAML(node *yaml.Node) error {
 		t.Dir = task.Dir
 		t.Set = task.Set
 		t.Shopt = task.Shopt
+		t.Sh = task.Sh
 		t.Vars = task.Vars
 		t.Env = task.Env
 		t.Dotenv = task.Dotenv
@@ -224,6 +227,7 @@ func (t *Task) DeepCopy() *Task {
 		Dir:                  t.Dir,
 		Set:                  deepcopy.Slice(t.Set),
 		Shopt:                deepcopy.Slice(t.Shopt),
+		Sh:                   append(ShArgs(nil), t.Sh...),
 		Vars:                 t.Vars.DeepCopy(),
 		Env:                  t.Env.DeepCopy(),
 		Dotenv:               deepcopy.Slice(t.Dotenv),

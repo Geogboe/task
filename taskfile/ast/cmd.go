@@ -16,6 +16,7 @@ type Cmd struct {
 	Silent      bool
 	Set         []string
 	Shopt       []string
+	Sh          ShArgs
 	Vars        *Vars
 	IgnoreError bool
 	Defer       bool
@@ -34,6 +35,7 @@ func (c *Cmd) DeepCopy() *Cmd {
 		Silent:      c.Silent,
 		Set:         deepcopy.Slice(c.Set),
 		Shopt:       deepcopy.Slice(c.Shopt),
+		Sh:          append(ShArgs(nil), c.Sh...),
 		Vars:        c.Vars.DeepCopy(),
 		IgnoreError: c.IgnoreError,
 		Defer:       c.Defer,
@@ -61,6 +63,7 @@ func (c *Cmd) UnmarshalYAML(node *yaml.Node) error {
 			Silent      bool
 			Set         []string
 			Shopt       []string
+			Sh          ShArgs
 			Vars        *Vars
 			IgnoreError bool `yaml:"ignore_error"`
 			Defer       *Defer
@@ -109,6 +112,7 @@ func (c *Cmd) UnmarshalYAML(node *yaml.Node) error {
 			c.Silent = cmdStruct.Silent
 			c.Set = cmdStruct.Set
 			c.Shopt = cmdStruct.Shopt
+			c.Sh = cmdStruct.Sh
 			c.IgnoreError = cmdStruct.IgnoreError
 			c.Platforms = cmdStruct.Platforms
 			return nil

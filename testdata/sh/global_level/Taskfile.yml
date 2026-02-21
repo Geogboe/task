@@ -1,0 +1,9 @@
+version: '3'
+
+silent: true
+sh: echo
+
+tasks:
+  default:
+    cmds:
+      - env true

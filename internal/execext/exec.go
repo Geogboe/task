@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -26,6 +27,7 @@ type RunCommandOptions struct {
 	Env       []string
 	PosixOpts []string
 	BashOpts  []string
+	Sh        []string
 	Stdin     io.Reader
 	Stdout    io.Writer
 	Stderr    io.Writer
@@ -59,7 +61,7 @@ func RunCommand(ctx context.Context, opts *RunCommandOptions) error {
 	r, err := interp.New(
 		interp.Params(params...),
 		interp.Env(expand.ListEnviron(environ...)),
-		interp.ExecHandlers(execHandlers()...),
+		interp.ExecHandlers(execHandlers(opts.Sh)...),
 		interp.OpenHandler(openHandler),
 		interp.StdIO(opts.Stdin, opts.Stdout, opts.Stderr),
 		dirOption(opts.Dir),
@@ -139,11 +141,53 @@ func ExpandFields(s string) ([]string, error) {
 	return expand.Fields(cfg, words...)
 }
 
-func execHandlers() (handlers []func(next interp.ExecHandlerFunc) interp.ExecHandlerFunc) {
+func execHandlers(sh []string) (handlers []func(next interp.ExecHandlerFunc) interp.ExecHandlerFunc) {
+	if len(sh) > 0 {
+		handlers = append(handlers, customShHandler(sh))
+	}
 	if useGoCoreUtils {
 		handlers = append(handlers, coreutils.ExecHandler)
 	}
 	return handlers
+}
+
+// customShHandler returns an exec handler middleware that forwards command
+// execution to the given custom shell. mvdan.cc/sh performs all shell
+// processing (variable expansion, control flow, etc.) and calls this handler
+// with the expanded command name and arguments. The handler then runs those
+// args through the custom shell instead of directly.
+func customShHandler(sh []string) func(next interp.ExecHandlerFunc) interp.ExecHandlerFunc {
+	return func(next interp.ExecHandlerFunc) interp.ExecHandlerFunc {
+		return func(ctx context.Context, args []string) error {
+			hc := interp.HandlerCtx(ctx)
+
+			// Collect exported environment variables from the interpreter state.
+			// This captures any variables set/exported by the shell script so far.
+			var envList []string
+			hc.Env.Each(func(name string, vr expand.Variable) bool {
+				if vr.Exported && vr.Kind == expand.String {
+					envList = append(envList, name+"="+vr.Str)
+				}
+				return true
+			})
+
+			cmd := exec.CommandContext(ctx, sh[0], append(sh[1:], args...)...)
+			cmd.Dir = hc.Dir
+			cmd.Env = envList
+			cmd.Stdin = hc.Stdin
+			cmd.Stdout = hc.Stdout
+			cmd.Stderr = hc.Stderr
+
+			if err := cmd.Run(); err != nil {
+				var exitErr *exec.ExitError
+				if errors.As(err, &exitErr) {
+					return interp.ExitStatus(uint8(exitErr.ExitCode()))
+				}
+				return err
+			}
+			return nil
+		}
+	}
 }
 
 func openHandler(ctx context.Context, path string, flag int, perm os.FileMode) (io.ReadWriteCloser, error) {
