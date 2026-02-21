@@ -417,6 +417,7 @@ func (e *Executor) runCommand(ctx context.Context, t *ast.Task, call *Call, i in
 			Env:       env.Get(t),
 			PosixOpts: slicesext.UniqueJoin(e.Taskfile.Set, t.Set, cmd.Set),
 			BashOpts:  slicesext.UniqueJoin(e.Taskfile.Shopt, t.Shopt, cmd.Shopt),
+			Sh:        effectiveSh(e.Taskfile.Sh, t.Sh, cmd.Sh),
 			Stdin:     e.Stdin,
 			Stdout:    stdOut,
 			Stderr:    stdErr,
@@ -433,6 +434,19 @@ func (e *Executor) runCommand(ctx context.Context, t *ast.Task, call *Call, i in
 	default:
 		return nil
 	}
+}
+
+// effectiveSh returns the most specific shell configuration (cmd > task > taskfile).
+// It returns nil when no level has a shell configured, which is distinct from
+// an empty slice. Callers must check len(result) > 0 before using it.
+func effectiveSh(taskfileSh, taskSh, cmdSh ast.ShArgs) []string {
+	if len(cmdSh) > 0 {
+		return []string(cmdSh)
+	}
+	if len(taskSh) > 0 {
+		return []string(taskSh)
+	}
+	return []string(taskfileSh)
 }
 
 func (e *Executor) startExecution(ctx context.Context, t *ast.Task, execute func(ctx context.Context) error) error {

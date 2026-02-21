@@ -2403,6 +2403,114 @@ func TestBashShellOptsCommandLevel(t *testing.T) {
 	assert.Equal(t, "globstar\ton\n", buff.String())
 }
 
+func TestCustomShGlobalLevel(t *testing.T) {
+	t.Parallel()
+
+	var buff bytes.Buffer
+	e := task.NewExecutor(
+		task.WithDir("testdata/sh/global_level"),
+		task.WithStdout(&buff),
+		task.WithStderr(&buff),
+	)
+	require.NoError(t, e.Setup())
+
+	err := e.Run(t.Context(), &task.Call{Task: "default"})
+	require.NoError(t, err)
+	assert.Equal(t, "env true\n", buff.String())
+}
+
+func TestCustomShTaskLevel(t *testing.T) {
+	t.Parallel()
+
+	var buff bytes.Buffer
+	e := task.NewExecutor(
+		task.WithDir("testdata/sh/task_level"),
+		task.WithStdout(&buff),
+		task.WithStderr(&buff),
+	)
+	require.NoError(t, e.Setup())
+
+	err := e.Run(t.Context(), &task.Call{Task: "default"})
+	require.NoError(t, err)
+	assert.Equal(t, "env true\n", buff.String())
+}
+
+func TestCustomShCommandLevel(t *testing.T) {
+	t.Parallel()
+
+	var buff bytes.Buffer
+	e := task.NewExecutor(
+		task.WithDir("testdata/sh/command_level"),
+		task.WithStdout(&buff),
+		task.WithStderr(&buff),
+	)
+	require.NoError(t, e.Setup())
+
+	err := e.Run(t.Context(), &task.Call{Task: "default"})
+	require.NoError(t, err)
+	assert.Equal(t, "env true\n", buff.String())
+}
+
+// TestCustomShCommandStringGlobalLevel verifies that a sh spec whose last
+// element is a flag (e.g. "sh -c") joins expanded args into a single quoted
+// string rather than passing them individually, making bash/sh/pwsh -c work.
+func TestCustomShCommandStringGlobalLevel(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("sh -c not available on Windows")
+	}
+	t.Parallel()
+
+	var buff bytes.Buffer
+	e := task.NewExecutor(
+		task.WithDir("testdata/sh/command_string_global_level"),
+		task.WithStdout(&buff),
+		task.WithStderr(&buff),
+	)
+	require.NoError(t, e.Setup())
+
+	err := e.Run(t.Context(), &task.Call{Task: "default"})
+	require.NoError(t, err)
+	assert.Equal(t, "hello\n", buff.String())
+}
+
+func TestCustomShCommandStringTaskLevel(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("sh -c not available on Windows")
+	}
+	t.Parallel()
+
+	var buff bytes.Buffer
+	e := task.NewExecutor(
+		task.WithDir("testdata/sh/command_string_task_level"),
+		task.WithStdout(&buff),
+		task.WithStderr(&buff),
+	)
+	require.NoError(t, e.Setup())
+
+	err := e.Run(t.Context(), &task.Call{Task: "default"})
+	require.NoError(t, err)
+	assert.Equal(t, "hello\n", buff.String())
+}
+
+func TestCustomShCommandStringCommandLevel(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("sh -c not available on Windows")
+	}
+	t.Parallel()
+
+	var buff bytes.Buffer
+	e := task.NewExecutor(
+		task.WithDir("testdata/sh/command_string_command_level"),
+		task.WithStdout(&buff),
+		task.WithStderr(&buff),
+	)
+	require.NoError(t, e.Setup())
+
+	err := e.Run(t.Context(), &task.Call{Task: "default"})
+	require.NoError(t, err)
+	assert.Equal(t, "hello\n", buff.String())
+}
+
 func TestSplitArgs(t *testing.T) {
 	t.Parallel()
 
