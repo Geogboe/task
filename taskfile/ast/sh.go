@@ -10,25 +10,31 @@ import (
 
 // ShArgs represents the shell/interpreter used to execute commands.
 // When set, commands are run by appending the expanded command name and
-// arguments as separate items to the specified shell. For example, setting
-// sh to ["docker", "run", "--rm", "alpine"] will run commands as:
+// arguments to the specified shell. mvdan.cc/sh handles all shell processing
+// (variable expansion, control flow, etc.) and the custom shell is invoked
+// only for external (non-builtin) command execution.
 //
-//	docker run --rm alpine <cmd> [args...]
+// Two calling conventions are supported automatically based on the last
+// element of the sh specification:
 //
-// mvdan.cc/sh handles all shell processing (variable expansion, control flow,
-// etc.) and calls the custom shell only for external (non-builtin) command
-// execution, with the already-expanded command and arguments.
+// Separate-args mode (last element does NOT start with '-'):
 //
-// This is well-suited for prefix-style wrappers such as:
+//	Each expanded argument is passed as a separate OS-level argument.
+//	Suitable for prefix wrappers:
 //
-//	sh: docker run --rm alpine
-//	sh: ssh user@host
-//	sh: sudo
-//	sh: timeout 10
+//	  sh: docker run --rm alpine   →  docker run --rm alpine <cmd> [args...]
+//	  sh: ssh user@host            →  ssh user@host <cmd> [args...]
+//	  sh: sudo                     →  sudo <cmd> [args...]
 //
-// Note: shells that expect a single command string argument (e.g. bash -c or
-// sh -c) do not work with this model, because each argument is passed
-// separately rather than as one string.
+// Join mode (last element starts with '-', e.g. -c):
+//
+//	All expanded arguments are shell-quoted and joined into a single string
+//	that is passed as one OS-level argument. Suitable for shells that accept
+//	a command string:
+//
+//	  sh: bash -c       →  bash -c '<cmd> [args...]'
+//	  sh: sh -c         →  sh -c '<cmd> [args...]'
+//	  sh: pwsh -nop -c  →  pwsh -nop -c '<cmd> [args...]'
 //
 // In YAML, this can be specified as a string (split on whitespace) or a list:
 //

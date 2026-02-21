@@ -1,0 +1,9 @@
+version: '3'
+
+silent: true
+sh: sh -c
+
+tasks:
+  default:
+    cmds:
+      - env echo hello

@@ -156,7 +156,32 @@ func execHandlers(sh []string) (handlers []func(next interp.ExecHandlerFunc) int
 // processing (variable expansion, control flow, etc.) and calls this handler
 // with the expanded command name and arguments. The handler then runs those
 // args through the custom shell instead of directly.
+//
+// Two calling conventions are selected automatically based on the last element
+// of sh:
+//
+//   - Separate-args mode (last element does NOT start with '-'): each
+//     expanded arg is appended as a separate OS argument. Suitable for
+//     prefix wrappers like "docker run --rm alpine", "ssh user@host", "sudo".
+//
+//   - Join mode (last element starts with '-'): all expanded args are
+//     POSIX-single-quote-escaped and joined into one string that is passed
+//     as a single OS argument. This makes "bash -c", "sh -c", and
+//     "pwsh -nop -c" work correctly.
+//     Note: POSIX single-quote escaping is understood by POSIX-compatible
+//     shells (bash, sh, zsh, dash, etc.) but not by PowerShell, which uses
+//     different quoting rules. PowerShell commands that do not contain
+//     embedded single quotes will work fine.
+//
+// The mode is controlled by the user: place the command-string flag (e.g. -c)
+// as the last element of sh to activate join mode, or end with a non-flag for
+// separate-args mode (e.g. "sh: [myshell, -v, -c]" uses join mode because
+// "-c" is last, while "sh: [myshell, -c, somearg]" uses separate-args mode).
 func customShHandler(sh []string) func(next interp.ExecHandlerFunc) interp.ExecHandlerFunc {
+	// Use join mode when the last sh element starts with '-', indicating it is
+	// a command-string flag (e.g. -c for bash/sh, -Command/-c for PowerShell).
+	joinMode := len(sh) > 0 && strings.HasPrefix(sh[len(sh)-1], "-")
+
 	return func(next interp.ExecHandlerFunc) interp.ExecHandlerFunc {
 		return func(ctx context.Context, args []string) error {
 			hc := interp.HandlerCtx(ctx)
@@ -171,7 +196,17 @@ func customShHandler(sh []string) func(next interp.ExecHandlerFunc) interp.ExecH
 				return true
 			})
 
-			cmd := exec.CommandContext(ctx, sh[0], append(sh[1:], args...)...)
+			// Build the argument list for the custom shell.
+			var extraArgs []string
+			if joinMode {
+				// Join mode: pack all expanded args into a single shell-quoted
+				// string so that the target shell (-c) re-parses them correctly.
+				extraArgs = []string{shellJoin(args)}
+			} else {
+				extraArgs = args
+			}
+
+			cmd := exec.CommandContext(ctx, sh[0], append(sh[1:], extraArgs...)...)
 			cmd.Dir = hc.Dir
 			cmd.Env = envList
 			cmd.Stdin = hc.Stdin
@@ -188,6 +223,29 @@ func customShHandler(sh []string) func(next interp.ExecHandlerFunc) interp.ExecH
 			return nil
 		}
 	}
+}
+
+// shellJoin joins args into a single POSIX shell-quoted string suitable for
+// passing as the command-string argument to a shell's -c flag.
+// Each argument is individually single-quote escaped so that whitespace,
+// metacharacters, and variable references within an argument are preserved
+// exactly when the target shell re-parses the string.
+// POSIX single-quote escaping is compatible with bash, sh, zsh, dash, etc.
+// PowerShell uses different quoting rules but handles simple strings without
+// embedded single quotes correctly.
+func shellJoin(args []string) string {
+	quoted := make([]string, len(args))
+	for i, arg := range args {
+		quoted[i] = shellQuote(arg)
+	}
+	return strings.Join(quoted, " ")
+}
+
+// shellQuote wraps s in POSIX single quotes, escaping any embedded single
+// quotes using the standard `'\''` idiom. The result is safe to embed in a
+// shell command string passed via -c.
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
 func openHandler(ctx context.Context, path string, flag int, perm os.FileMode) (io.ReadWriteCloser, error) {
